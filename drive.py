@@ -16,10 +16,11 @@ class Drive:
         self.throttle_pin = "P9_14"
         self.steering_pin = "P8_13"
 
-        self.cur_throttle = 7.95
+        self.start_throttle = 7.5
+        self.cur_throttle = 7.5
 
-        PWM.start(self.throttle_pin, self.cur_throttle, 50, 0)
-        PWM.set_duty_cycle(self.throttle_pin, self.cur_throttle)
+        PWM.start(self.throttle_pin, self.start_throttle, 50, 0)
+        PWM.set_duty_cycle(self.throttle_pin, self.start_throttle)
         PWM.set_frequency(self.throttle_pin, 50)
 
         PWM.start(self.steering_pin, 7.5, 50, 0)
@@ -55,7 +56,11 @@ class Drive:
         return cur_ticks
 
     def set_throttle_v2(self, target, current):
-        delta = 0.0005
+        if target == 0:
+            self.set_throttle_direct(self.start_throttle)
+            return
+        # delta = 0.0005 # Useful for higher speed
+        delta = 0.0001 # Useful for lower speed
         if abs(target - current) < 1:
             pass
         elif current < target:
@@ -78,7 +83,12 @@ if __name__ == "__main__":
     drive = Drive()
     drive.set_steering(8)
 
-    throttle_vals = [3, 8, 6, 10, 4, 0]
+    time.sleep(5)
+    drive.set_throttle_direct(7.95)
+
+    #throttle_vals = [3, 8, 6, 10, 4, 0]
+    throttle_vals = [3, 4, 5, 4, 3, 3, 4, 5]
+
 
     UART.setup("UART1")
     ser = Serial("/dev/ttyO1", 9600)
@@ -98,7 +108,7 @@ if __name__ == "__main__":
         throttle, steering  = dec_line[1:].strip().split("|")
         print(throttle, throttle_vals[idx])
         drive.set_throttle_v2(throttle_vals[idx], int(throttle))
-        if time.time() - start > 3:
+        if time.time() - start > 4:
             start = time.time()
             idx += 1
             if not idx < len(throttle_vals):
