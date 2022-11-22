@@ -1,0 +1,3 @@
+[submodule "EthernetAPI"]
+	path = EthernetAPI
+	url = https://github.com/nicorossirice/EthernetAPI.git
