@@ -3,7 +3,7 @@ import signal
 import Adafruit_BBIO.UART as UART
 from serial import Serial
 
-from EthernetAPI.client import Client
+from EthernetAPI.server import Server
 from EthernetAPI.message_types import RC_DATA
 
 def cleanup(signum, stackframe):
@@ -18,8 +18,8 @@ if __name__ == "__main__":
     ser.close()
     ser.open()
 
-    #client = Client()
-    #client.connect()
+    server = Server()
+    server.connect()
 
     while True:
         line = ser.readline()
@@ -31,4 +31,5 @@ if __name__ == "__main__":
             continue
         throttle, steering = dec_line[1:].strip().split("|")
         print(f"{throttle}|{float(steering) / 200}")
+        server.send_message(RC_DATA, f"{throttle}|{float(steering) / 0.02}")
         #client.send_message(RC_DATA, f"{throttle}|{float(steering) / 0.02}")
