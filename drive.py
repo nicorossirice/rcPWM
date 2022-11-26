@@ -1,3 +1,4 @@
+import signal
 import time
 
 import Adafruit_BBIO.GPIO as GPIO
@@ -6,6 +7,11 @@ import Adafruit_BBIO.UART as UART
 from serial import Serial
 
 from encoder import Encoder
+from EthernetAPI.server import Server
+from EthernetAPI.message_types import RC_ORDER
+
+def shutdown_pwm(signum, stackframe):
+    PWM.cleanup()
 
 # THROTTLE RANGE 7.5 - 8
 # STEERING RANGE 6-9
@@ -37,25 +43,26 @@ class Drive:
         PWM.set_duty_cycle(self.throttle_pin, duty_cycle)
         self.cur_throttle = duty_cycle
 
-    def set_throttle(self, ticks):
-        valid = 0
-        necessary_valid = 10
-        while True:
-            cur_ticks = self.encoder.get_ticks()
-            if abs(cur_ticks - ticks) < 50:
-                valid += 1
-                if valid > necessary_valid:
-                    break
-            elif cur_ticks < ticks:
-                valid = 0
-                self.set_throttle_direct(self.cur_throttle + 0.01)
-            elif cur_ticks > ticks:
-                valid = 0
-                self.set_throttle_direct(self.cur_throttle - 0.01)
-            time.sleep(0.1)
-        return cur_ticks
+    # Old set throttle method
+    # def set_throttle(self, ticks):
+    #     valid = 0
+    #     necessary_valid = 10
+    #     while True:
+    #         cur_ticks = self.encoder.get_ticks()
+    #         if abs(cur_ticks - ticks) < 50:
+    #             valid += 1
+    #             if valid > necessary_valid:
+    #                 break
+    #         elif cur_ticks < ticks:
+    #             valid = 0
+    #             self.set_throttle_direct(self.cur_throttle + 0.01)
+    #         elif cur_ticks > ticks:
+    #             valid = 0
+    #             self.set_throttle_direct(self.cur_throttle - 0.01)
+    #         time.sleep(0.1)
+    #     return cur_ticks
 
-    def set_throttle_v2(self, target, current):
+    def set_throttle(self, target, current):
         if target == 0:
             self.set_throttle_direct(self.start_throttle)
             return
@@ -78,6 +85,55 @@ class Drive:
         PWM.stop(self.steering_pin)
         PWM.cleanup()
         self.encoder.close()
+
+    def drive_loop(self):
+        server = Server()
+        server.connect()
+
+        UART.setup("UART1")
+        ser = Serial("/dev/ttyO1", 9600)
+        ser.close()
+        ser.open()
+
+        throttle_order = None
+        steering_order = None
+        throttle_actual = None
+        steering_actual = None
+
+        old_mask = signal.pthread_sigmask({signal.SIGINT}, signal.SIG_BLOCK)
+
+        while True:
+            line = ser.readline()
+            try:
+                dec_line = line.decode()
+            except UnicodeDecodeError:
+                continue
+            if dec_line[0] != "S":
+                continue
+            throttle_actual, steering_actual  = dec_line[1:].strip().split("|")
+
+            messages = server.read_messages()
+            if messages:
+                for mtype, message in messages[::-1]:
+                    if mtype == RC_ORDER:
+                        throttle_str, steering_str = message.split("|")
+                        throttle_order = int(throttle_str)
+                        steering_order = int(steering_str)
+                        break
+            elif not throttle_order or not steering_order:
+                continue 
+            
+            self.set_steering(steering_order)
+            self.set_throttle(throttle_order, throttle_actual)
+
+            if signal.SIGINT in signal.sigpending():
+                self.close()
+                server.close()
+                ser.close()
+                break
+
+        signal.pthread_sigmask(old_mask, signal.SET_MASK)
+
 
 if __name__ == "__main__":
     drive = Drive()
@@ -107,7 +163,7 @@ if __name__ == "__main__":
             continue
         throttle, steering  = dec_line[1:].strip().split("|")
         print(throttle, throttle_vals[idx])
-        drive.set_throttle_v2(throttle_vals[idx], int(throttle))
+        drive.set_throttle(throttle_vals[idx], int(throttle))
         if time.time() - start > 4:
             start = time.time()
             idx += 1
