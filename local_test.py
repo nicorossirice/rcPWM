@@ -1,4 +1,6 @@
+import select
 import signal
+import sys
 from time import sleep, time
 
 import Adafruit_BBIO.UART as UART
@@ -23,6 +25,7 @@ if __name__ == "__main__":
     throttle_vals = [0, 4, 4, 4]
     cur_time = time()
     idx = 0
+    order = 0
     while True:
         line = ser.readline()
         try:
@@ -32,8 +35,11 @@ if __name__ == "__main__":
         if dec_line[0] != "S":
             continue
         throttle, steering = dec_line[1:].strip().split("|")
-        print(throttle, throttle_vals[idx])
-        d.set_throttle(throttle_vals[idx], int(throttle), delta=0.0003)
+        i, o, e = select.select( [sys.stdin], [], [], 0 )
+        if (i):
+            order = int(sys.stdin.readline().strip())
+        print(throttle, order)
+        d.set_throttle(order, int(throttle), delta=0.0003)
         if time() - cur_time > 4:
             idx += 1
             cur_time = time()
