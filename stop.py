@@ -19,7 +19,7 @@ def shutdown_pwm(signum, stackframe):
 class Drive:
 
     def __init__(self):
-        self.throttle_pin = "P8_19"
+        self.throttle_pin = "P9_14"
         self.steering_pin = "P8_13"
 
         self.start_throttle = 7.5
@@ -62,25 +62,24 @@ class Drive:
     #         time.sleep(0.1)
     #     return cur_ticks
 
-    def set_throttle(self, target, current, delta=0.0001):
+    def set_throttle(self, target, current):
         if target == 0:
             print("Throttle zeroed")
             #self.set_throttle_direct(self.start_throttle)
             self.set_throttle_direct(7.85)
             return
-        #delta = .0005 # Useful for higher speed
-        #delta = 0.0001 # Useful for lower speed
+        # delta = 0.0005 # Useful for higher speed
+        delta = 0.0001 # Useful for lower speed
         print(target, current, (target - current))
         if abs(target - current) < 1:
             pass
         elif current < target:
             print("Throttle increase")
             self.set_throttle_direct(self.cur_throttle + delta)
-            #self.set_throttle_direct(target)    
         elif current > target:
             print("Throttle decrease")
             self.set_throttle_direct(self.cur_throttle - delta)
-            #self.set_throttle_direct(target)
+
     def set_steering(self, duty_cycle):
         PWM.set_duty_cycle(self.steering_pin, duty_cycle)
 
@@ -118,23 +117,17 @@ class Drive:
                 continue
             throttle_actual, steering_actual  = dec_line[1:].strip().split("|")
 
-            messages = server.read_messages(timeout=0.001)
+            messages = server.read_messages()
             if messages:
                 for mtype, message in messages[::-1]:
                     if mtype == RC_ORDER:
                         throttle_str, steering_str = message.split("|")
                         throttle_order = int(float(throttle_str))
-                        if throttle_order != 0:
-                            throttle_order = 3
-                        else:
-                            throttle_order =0;
                         steering_order = float(steering_str)
                         break
             elif not throttle_order or not steering_order:
                 print("Skipping due to no orders")
                 continue
-            else:
-                print("No order")
 
             self.set_steering(steering_order)
             self.set_throttle(throttle_order, int(throttle_actual))
@@ -150,7 +143,7 @@ class Drive:
 
 if __name__ == "__main__":
     drive = Drive()
-    drive.drive_loop()
+#    drive.drive_loop()
     exit()
     drive.set_steering(8)
 

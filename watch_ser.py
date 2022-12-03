@@ -5,7 +5,7 @@ from serial import Serial
 
 UART.setup("UART1")
 
-ser = Serial(port="/dev/ttyO1", baudrate=115200)
+ser = Serial(port="/dev/ttyO1", baudrate=9600)
 ser.close()
 ser.open()
 if ser.isOpen():
