@@ -1,3 +1,4 @@
+import signal
 from time import sleep, time
 
 import Adafruit_BBIO.UART as UART
@@ -7,12 +8,19 @@ from drive import Drive
 
 if __name__ == "__main__":
     d = Drive()
+
+    def cleanup(signum, stackframe):
+        print("Cleaning up...")
+        d.close()
+        exit()
+    signal.signal(signal.SIGINT, cleanup)
     UART.setup("UART1")
     ser = Serial("/dev/ttyO1", 9600)
     ser.close()
     ser.open()
     sleep(5)
-    throttle_vals = [0, 4, 6, 8, 6, 5, 6]
+    #throttle_vals = [0, 4, 6, 8, 6, 5, 6]
+    throttle_vals = [0, 4, 4, 4]
     cur_time = time()
     idx = 0
     while True:
