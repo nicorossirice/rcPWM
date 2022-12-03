@@ -63,26 +63,41 @@ class Drive:
     #     return cur_ticks
 
     def set_throttle(self, target, current, delta=0.0001):
+        # Change delta to effect how fast the PWM value changes
         if target == 0:
             print("Throttle zeroed")
             #self.set_throttle_direct(self.start_throttle)
             self.set_throttle_direct(7.85)
             return
-        #delta = .0005 # Useful for higher speed
-        #delta = 0.0001 # Useful for lower speed
-        print(target, current, (target - current))
-        if abs(target - current) < 1:
+        diff = abs(target - current)
+        print(target, current, diff)
+        if diff < 2:
             pass
         elif current < target:
             print("Throttle increase")
-            self.set_throttle_direct(self.cur_throttle + delta)
+            # self.set_throttle_direct(self.cur_throttle + delta)
+            self.set_throttle_direct(self.cur_throttle + self.diff_to_delta(diff))
             #self.set_throttle_direct(target)    
         elif current > target:
             print("Throttle decrease")
-            self.set_throttle_direct(self.cur_throttle - delta)
+            # self.set_throttle_direct(self.cur_throttle - delta)
+            self.set_throttle_direct(self.cur_throttle - self.diff_to_delta(diff))
             #self.set_throttle_direct(target)
+
     def set_steering(self, duty_cycle):
         PWM.set_duty_cycle(self.steering_pin, duty_cycle)
+
+    def diff_to_delta(throttle_diff):
+        if throttle_diff < 2:
+            return 0.00001
+        elif throttle_diff < 3:
+            return 0.00005
+        elif throttle_diff < 4:
+            return 0.0001
+        elif throttle_diff < 5:
+            return 0.0003
+        else:
+            return 0.0004
 
     def close(self):
         self.set_steering(7.5)
