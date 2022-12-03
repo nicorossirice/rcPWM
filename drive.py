@@ -38,6 +38,8 @@ class Drive:
     def get_speed(self):
         return self.encoder.get_ticks()
 
+    def is_reversing(self):
+        return self.cur_throttle < 7.5
 
     def set_throttle_direct(self, duty_cycle):
         PWM.set_duty_cycle(self.throttle_pin, duty_cycle)
@@ -66,7 +68,7 @@ class Drive:
         if target == 0:
             print("Throttle zeroed")
             #self.set_throttle_direct(self.start_throttle)
-            self.set_throttle_direct(7.85)
+            self.set_throttle_direct(7.5)
             return
 
         jump = 0
@@ -75,18 +77,32 @@ class Drive:
 
         diff = abs(target - current)
         print(target, current, diff)
-        if diff < 2:
-            pass
-        elif current < target:
-            print("Throttle increase")
-            # self.set_throttle_direct(self.cur_throttle + delta)
-            self.set_throttle_direct(self.cur_throttle + (jump + self.diff_to_delta(diff)))
-            #self.set_throttle_direct(target)    
-        elif current > target:
-            print("Throttle decrease")
-            # self.set_throttle_direct(self.cur_throttle - delta)
-            self.set_throttle_direct(self.cur_throttle - (jump + self.diff_to_delta(diff)))
-            #self.set_throttle_direct(target)
+        if target > 0:
+            if diff < 2:
+                pass
+            elif current < target:
+                print("Throttle increase")
+                # self.set_throttle_direct(self.cur_throttle + delta)
+                self.set_throttle_direct(self.cur_throttle + (jump + self.diff_to_delta(diff)))
+                #self.set_throttle_direct(target)    
+            elif current > target:
+                print("Throttle decrease")
+                # self.set_throttle_direct(self.cur_throttle - delta)
+                self.set_throttle_direct(self.cur_throttle - (jump + self.diff_to_delta(diff)))
+                #self.set_throttle_direct(target)
+        elif target < 0:
+            if diff < 2:
+                pass
+            elif current > target:
+                print("Throttle increase")
+                # self.set_throttle_direct(self.cur_throttle + delta)
+                self.set_throttle_direct(self.cur_throttle + (jump + self.diff_to_delta(diff)))
+                #self.set_throttle_direct(target)
+            elif current < target:
+                print("Throttle decrease")
+                # self.set_throttle_direct(self.cur_throttle - delta)
+                self.set_throttle_direct(self.cur_throttle - (jump + self.diff_to_delta(diff)))
+                #self.set_throttle_direct(target)
 
     def set_steering(self, duty_cycle):
         PWM.set_duty_cycle(self.steering_pin, duty_cycle)
