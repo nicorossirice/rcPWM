@@ -87,7 +87,7 @@ class Drive:
     def set_steering(self, duty_cycle):
         PWM.set_duty_cycle(self.steering_pin, duty_cycle)
 
-    def diff_to_delta(throttle_diff):
+    def diff_to_delta(self, throttle_diff):
         if throttle_diff < 2:
             return 0.00001
         elif throttle_diff < 3:
