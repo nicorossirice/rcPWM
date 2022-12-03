@@ -20,7 +20,8 @@ if __name__ == "__main__":
     ser = Serial("/dev/ttyO1", 9600)
     ser.close()
     ser.open()
-    sleep(5)
+    sleep(2)
+    d.set_throttle_direct(7.85)
     #throttle_vals = [0, 4, 6, 8, 6, 5, 6]
     throttle_vals = [0, 4, 4, 4]
     cur_time = time()
@@ -38,8 +39,10 @@ if __name__ == "__main__":
         i, o, e = select.select( [sys.stdin], [], [], 0 )
         if (i):
             order = int(sys.stdin.readline().strip())
-        print(throttle, order)
+        #print(throttle, order)
         d.set_throttle(order, int(throttle), delta=0.0003)
+        sleep(0.01)
+        continue
         if time() - cur_time > 4:
             idx += 1
             cur_time = time()

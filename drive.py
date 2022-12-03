@@ -22,6 +22,8 @@ class Drive:
         self.throttle_pin = "P8_19"
         self.steering_pin = "P8_13"
 
+        self.jumped = False
+
         self.start_throttle = 7.5
         self.cur_throttle = 7.5
 
@@ -64,26 +66,28 @@ class Drive:
 
     def set_throttle(self, target, current, delta=0.0001):
         if target == 0:
-            print("Throttle zeroed")
+            self.jumped = False
+            #print("Throttle zeroed")
             #self.set_throttle_direct(self.start_throttle)
             self.set_throttle_direct(7.85)
             return
 
         jump = 0
-        if current == 0:
-            jump = 0.005
+        if not self.jumped and current == 0:
+            jump = 0.15
+            self.jumped = True
 
         diff = abs(target - current)
         print(target, current, diff)
-        if diff < 2:
+        if diff < 1:
             pass
         elif current < target:
-            print("Throttle increase")
+            #print("Throttle increase")
             # self.set_throttle_direct(self.cur_throttle + delta)
             self.set_throttle_direct(self.cur_throttle + (jump + self.diff_to_delta(diff)))
             #self.set_throttle_direct(target)    
         elif current > target:
-            print("Throttle decrease")
+            #print("Throttle decrease")
             # self.set_throttle_direct(self.cur_throttle - delta)
             self.set_throttle_direct(self.cur_throttle - (jump + self.diff_to_delta(diff)))
             #self.set_throttle_direct(target)
@@ -92,13 +96,13 @@ class Drive:
         PWM.set_duty_cycle(self.steering_pin, duty_cycle)
 
     def diff_to_delta(self, throttle_diff):
-        if throttle_diff < 2:
-            return 0.00001
-        elif throttle_diff < 3:
-            return 0.00005
-        elif throttle_diff < 4:
-            return 0.0001
+        if throttle_diff < 3:
+            return -0.00005
         elif throttle_diff < 5:
+            return 0.00005
+        elif throttle_diff < 6:
+            return 0.0001
+        elif throttle_diff < 8:
             return 0.0003
         else:
             return 0.0004
