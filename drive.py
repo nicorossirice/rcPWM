@@ -76,6 +76,10 @@ class Drive:
 
         jump = 0
         if not self.jumped and current == 0:
+            if target > 0:
+                self.set_throttle_direct(7.85)
+            elif target < 0:
+                self.set_throttle_direct(7)
             jump = 0.15
             self.jumped = True
 
