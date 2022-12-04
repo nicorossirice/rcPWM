@@ -10,14 +10,12 @@ from encoder import Encoder
 from EthernetAPI.server import Server
 from EthernetAPI.message_types import RC_ORDER
 
-def shutdown_pwm(signum, stackframe):
-    PWM.cleanup()
 
 # THROTTLE RANGE 7.5 - 8
 # STEERING RANGE 6-9
 
-class Drive:
 
+class Drive:
     def __init__(self):
         self.throttle_pin = "P8_19"
         self.steering_pin = "P8_13"
@@ -47,30 +45,10 @@ class Drive:
         PWM.set_duty_cycle(self.throttle_pin, duty_cycle)
         self.cur_throttle = duty_cycle
 
-    # Old set throttle method
-    # def set_throttle(self, ticks):
-    #     valid = 0
-    #     necessary_valid = 10
-    #     while True:
-    #         cur_ticks = self.encoder.get_ticks()
-    #         if abs(cur_ticks - ticks) < 50:
-    #             valid += 1
-    #             if valid > necessary_valid:
-    #                 break
-    #         elif cur_ticks < ticks:
-    #             valid = 0
-    #             self.set_throttle_direct(self.cur_throttle + 0.01)
-    #         elif cur_ticks > ticks:
-    #             valid = 0
-    #             self.set_throttle_direct(self.cur_throttle - 0.01)
-    #         time.sleep(0.1)
-    #     return cur_ticks
-
     def set_throttle(self, target, current, delta=0.0001):
         if target == 0:
             self.jumped = False
-            #print("Throttle zeroed")
-            #self.set_throttle_direct(self.start_throttle)
+            # print("Throttle zeroed")
             self.set_throttle_direct(7.5)
             return
 
@@ -89,28 +67,24 @@ class Drive:
             if diff < 1:
                 pass
             elif current < target:
-                # print("Throttle increase")
-                # self.set_throttle_direct(self.cur_throttle + delta)
-                self.set_throttle_direct(self.cur_throttle + (jump + self.diff_to_delta(diff)))
-                #self.set_throttle_direct(target)    
+                self.set_throttle_direct(
+                    self.cur_throttle + (jump + self.diff_to_delta(diff))
+                )
             elif current > target:
-                # print("Throttle decrease")
-                # self.set_throttle_direct(self.cur_throttle - delta)
-                self.set_throttle_direct(self.cur_throttle - (jump + self.diff_to_delta(diff)))
-                #self.set_throttle_direct(target)
+                self.set_throttle_direct(
+                    self.cur_throttle - (jump + self.diff_to_delta(diff))
+                )
         elif target < 0:
             if diff < 1:
                 pass
             elif current > target:
-                # print("Throttle increase")
-                # self.set_throttle_direct(self.cur_throttle + delta)
-                self.set_throttle_direct(self.cur_throttle + (jump + self.diff_to_delta(diff)))
-                #self.set_throttle_direct(target)
+                self.set_throttle_direct(
+                    self.cur_throttle + (jump + self.diff_to_delta(diff))
+                )
             elif current < target:
-                # print("Throttle decrease")
-                # self.set_throttle_direct(self.cur_throttle - delta)
-                self.set_throttle_direct(self.cur_throttle - (jump + self.diff_to_delta(diff)))
-                #self.set_throttle_direct(target)
+                self.set_throttle_direct(
+                    self.cur_throttle - (jump + self.diff_to_delta(diff))
+                )
 
     def set_steering(self, duty_cycle):
         PWM.set_duty_cycle(self.steering_pin, duty_cycle)
@@ -149,9 +123,15 @@ class Drive:
         throttle_actual = None
         steering_actual = None
 
-        old_mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGINT})
+        run = True
+
+        def cleanup(signum, stackframe):
+            run = False
+
+        signal.signal(signal.SIGINT, cleanup)
+
         self.set_throttle_direct(7.85)
-        while True:
+        while run:
             line = ser.readline()
             try:
                 dec_line = line.decode()
@@ -159,7 +139,7 @@ class Drive:
                 continue
             if dec_line[0] != "S":
                 continue
-            throttle_actual, steering_actual  = dec_line[1:].strip().split("|")
+            throttle_actual, steering_actual = dec_line[1:].strip().split("|")
 
             messages = server.read_messages(timeout=0.001)
             if messages:
@@ -170,7 +150,7 @@ class Drive:
                         if throttle_order != 0:
                             throttle_order = 3
                         else:
-                            throttle_order =0;
+                            throttle_order = 0
                         steering_order = float(steering_str)
                         break
             elif not throttle_order or not steering_order:
@@ -182,13 +162,9 @@ class Drive:
             self.set_steering(steering_order)
             self.set_throttle(throttle_order, int(throttle_actual))
 
-            if signal.SIGINT in signal.sigpending():
-                self.close()
-                server.close()
-                ser.close()
-                break
-
-        signal.pthread_sigmask(signal.SIG_SETMASK, old_mask)
+        self.close()
+        server.close()
+        ser.close()
 
 
 if __name__ == "__main__":
@@ -200,9 +176,8 @@ if __name__ == "__main__":
     time.sleep(5)
     drive.set_throttle_direct(7.95)
 
-    #throttle_vals = [3, 8, 6, 10, 4, 0]
+    # throttle_vals = [3, 8, 6, 10, 4, 0]
     throttle_vals = [3, 4, 5, 4, 3, 3, 4, 5]
-
 
     UART.setup("UART1")
     ser = Serial("/dev/ttyO1", 9600)
@@ -219,7 +194,7 @@ if __name__ == "__main__":
             continue
         if dec_line[0] != "S":
             continue
-        throttle, steering  = dec_line[1:].strip().split("|")
+        throttle, steering = dec_line[1:].strip().split("|")
         print(throttle, throttle_vals[idx])
         drive.set_throttle(throttle_vals[idx], int(throttle))
         if time.time() - start > 4:
@@ -228,10 +203,10 @@ if __name__ == "__main__":
             if not idx < len(throttle_vals):
                 break
 
-    #print(drive.set_throttle_v2(3))
-    #time.sleep(2)
-    #print(drive.set_throttle(250))
-    #time.sleep(2)
-    #print(drive.set_throttle(100))
+    # print(drive.set_throttle_v2(3))
+    # time.sleep(2)
+    # print(drive.set_throttle(250))
+    # time.sleep(2)
+    # print(drive.set_throttle(100))
     time.sleep(2)
     drive.close()
