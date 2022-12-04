@@ -2,13 +2,18 @@ import signal
 import time
 
 import Adafruit_BBIO.GPIO as GPIO
-import Adafruit_BBIO.PWM as PWM
+# import Adafruit_BBIO.PWM as PWM
 import Adafruit_BBIO.UART as UART
 from serial import Serial
 
 from encoder import Encoder
 from EthernetAPI.server import Server
 from EthernetAPI.message_types import RC_ORDER
+
+# imports for I2C communications
+import sys
+import board
+import busio
 
 def shutdown_pwm(signum, stackframe):
     PWM.cleanup()
@@ -19,72 +24,55 @@ def shutdown_pwm(signum, stackframe):
 class Drive:
 
     def __init__(self):
-        self.throttle_pin = "P8_19"
-        self.steering_pin = "P8_13"
+        self.STEERING_ADR = 0x10
+        self.THROTTLE_BRAKE_ADDR = 0x18
+        
+        self.i2c_connection = busio.I2C(board.SCL, board.SDA)
+        
+        if not  self.THROTTLE_BRAKE_ADDR in self.i2c_connection.scan():
+            print("Didn't find Throttle And Brake Control Adruino.")
+
+        if not self.STEERING_ADR in self.i2c_connection.scan():
+            print("Didn't find Steering Control Adruino.")
 
         self.jumped = False
 
-        self.start_throttle = 7.5
-        self.cur_throttle = 7.5
+        self.start_throttle = 0
+        self.cur_throttle = 0
 
-        PWM.start(self.throttle_pin, self.start_throttle, 50, 0)
-        PWM.set_duty_cycle(self.throttle_pin, self.start_throttle)
-        PWM.set_frequency(self.throttle_pin, 50)
-
-        PWM.start(self.steering_pin, 7.5, 50, 0)
-        PWM.set_duty_cycle(self.steering_pin, 7.5)
-        PWM.set_frequency(self.steering_pin, 50)
+        self.i2c_connection.writeto(self.THROTTLE_BRAKE_ADDR, 
+                    bytes([self.start_throttle]))
+        
+        self.i2c_connection.writeto(self.STEERING_ADR, 
+                    bytes([128]))
 
         self.encoder = Encoder()
 
     def get_speed(self):
         return self.encoder.get_ticks()
 
-    def is_reversing(self):
-        return self.cur_throttle < 7.5
-
-    def set_throttle_direct(self, duty_cycle):
-        PWM.set_duty_cycle(self.throttle_pin, duty_cycle)
-        self.cur_throttle = duty_cycle
-
-    # Old set throttle method
-    # def set_throttle(self, ticks):
-    #     valid = 0
-    #     necessary_valid = 10
-    #     while True:
-    #         cur_ticks = self.encoder.get_ticks()
-    #         if abs(cur_ticks - ticks) < 50:
-    #             valid += 1
-    #             if valid > necessary_valid:
-    #                 break
-    #         elif cur_ticks < ticks:
-    #             valid = 0
-    #             self.set_throttle_direct(self.cur_throttle + 0.01)
-    #         elif cur_ticks > ticks:
-    #             valid = 0
-    #             self.set_throttle_direct(self.cur_throttle - 0.01)
-    #         time.sleep(0.1)
-    #     return cur_ticks
+    def set_throttle_direct(self, value):
+        if value < 255 and value >= 0:
+            self.i2c_connection.writeto(self.THROTTLE_BRAKE_ADDR, 
+                    bytes([value]))
+            self.cur_throttle = value
+        else:
+            print("ERROR: inappropriate throttle's value being sent = "+str(value))
+        
 
     def set_throttle(self, target, current, delta=0.0001):
+        self.set_throttle_direct(targe)
+        return
+    
         if target == 0:
             self.jumped = False
-            #print("Throttle zeroed")
+            print("Throttle zeroed")
             #self.set_throttle_direct(self.start_throttle)
-            self.set_throttle_direct(7.5)
+            self.set_throttle_direct(0)
             return
 
-        jump = 0
-        if not self.jumped and current == 0:
-            if target > 0:
-                self.set_throttle_direct(7.85)
-            elif target < 0:
-                self.set_throttle_direct(7)
-            jump = 0.15
-            self.jumped = True
-
         diff = abs(target - current)
-        print(target, current, diff)
+        #print(target, current, diff)
         if target > 0:
             if diff < 1:
                 pass
@@ -92,13 +80,14 @@ class Drive:
                 # print("Throttle increase")
                 # self.set_throttle_direct(self.cur_throttle + delta)
                 self.set_throttle_direct(self.cur_throttle + (jump + self.diff_to_delta(diff)))
-                #self.set_throttle_direct(target)    
+                #self.set_throttle_direct(target)
             elif current > target:
                 # print("Throttle decrease")
                 # self.set_throttle_direct(self.cur_throttle - delta)
                 self.set_throttle_direct(self.cur_throttle - (jump + self.diff_to_delta(diff)))
                 #self.set_throttle_direct(target)
         elif target < 0:
+            target = abs(target)
             if diff < 1:
                 pass
             elif current > target:
@@ -111,9 +100,11 @@ class Drive:
                 # self.set_throttle_direct(self.cur_throttle - delta)
                 self.set_throttle_direct(self.cur_throttle - (jump + self.diff_to_delta(diff)))
                 #self.set_throttle_direct(target)
+            print(self.cur_throttle)
 
-    def set_steering(self, duty_cycle):
-        PWM.set_duty_cycle(self.steering_pin, duty_cycle)
+    def set_steering(self, value):
+        self.i2c_connection.writeto(self.STEERING_ADR, 
+                    bytes([value]))
 
     def diff_to_delta(self, throttle_diff):
         if throttle_diff < 3:
@@ -128,11 +119,8 @@ class Drive:
             return 0.0004
 
     def close(self):
-        self.set_steering(7.5)
-        self.set_throttle_direct(7.5)
-        PWM.stop(self.throttle_pin)
-        PWM.stop(self.steering_pin)
-        PWM.cleanup()
+        self.set_steering(128)
+        self.set_throttle_direct(0)
         self.encoder.close()
 
     def drive_loop(self):
@@ -168,7 +156,7 @@ class Drive:
                         throttle_str, steering_str = message.split("|")
                         throttle_order = int(float(throttle_str))
                         if throttle_order != 0:
-                            throttle_order = 3
+                            throttle_order = 6
                         else:
                             throttle_order =0;
                         steering_order = float(steering_str)
