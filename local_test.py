@@ -21,7 +21,7 @@ if __name__ == "__main__":
     ser.close()
     ser.open()
     sleep(2)
-    d.set_throttle_direct(7.85)
+    #d.set_throttle_direct(7.85)
     #throttle_vals = [0, 4, 6, 8, 6, 5, 6]
     throttle_vals = [0, 4, 4, 4]
     cur_time = time()
