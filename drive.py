@@ -19,8 +19,8 @@ import busio
 # THROTTLE RANGE 7.5 - 8
 # STEERING RANGE 6-9
 
-class Drive:
 
+class Drive:
     def __init__(self):
         self.STEERING_ADR = 0x10
         self.THROTTLE_BRAKE_ADDR = 0x18
@@ -57,7 +57,7 @@ class Drive:
             return
 
         if value < 255 and value >= 0:
-            self.i2c_connection.writeto(self.THROTTLE_BRAKE_ADDR, 
+            self.i2c_connection.writeto(self.THROTTLE_BRAKE_ADDR,
                     bytes([value]))
             self.cur_throttle = value
         else:
@@ -86,19 +86,17 @@ class Drive:
                 self.set_throttle_direct(self.cur_throttle + (jump + self.diff_to_delta(diff)))
                 #self.set_throttle_direct(target)
             elif current > target:
-                # print("Throttle decrease")
-                # self.set_throttle_direct(self.cur_throttle - delta)
-                self.set_throttle_direct(self.cur_throttle - (jump + self.diff_to_delta(diff)))
-                #self.set_throttle_direct(target)
+                self.set_throttle_direct(
+                    self.cur_throttle - (jump + self.diff_to_delta(diff))
+                )
         elif target < 0:
             target = abs(target)
             if diff < 1:
                 pass
             elif current > target:
-                # print("Throttle increase")
-                # self.set_throttle_direct(self.cur_throttle + delta)
-                self.set_throttle_direct(self.cur_throttle + (jump + self.diff_to_delta(diff)))
-                #self.set_throttle_direct(target)
+                self.set_throttle_direct(
+                    self.cur_throttle + (jump + self.diff_to_delta(diff))
+                )
             elif current < target:
                 # print("Throttle decrease")
                 # self.set_throttle_direct(self.cur_throttle - delta)
@@ -110,7 +108,7 @@ class Drive:
         if not self.STEERING_CONNECTED:
             print("ERROR: THROTTLE ADRUINOS DISCONNECTED. ")
             return
-        self.i2c_connection.writeto(self.STEERING_ADR, 
+        self.i2c_connection.writeto(self.STEERING_ADR,
                     bytes([value]))
 
     def diff_to_delta(self, throttle_diff):
@@ -210,4 +208,3 @@ if __name__ == "__main__":
     drive = Drive()
     drive.drive_loop()
     exit()
-
