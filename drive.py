@@ -53,7 +53,7 @@ class Drive:
 
     def set_throttle_direct(self, value):
         if not self.THROTTLE_CONNECTED:
-            print("ERROR: THROTTLE ADRUINOS DISCONNECTED. ")
+            print("ERROR: THROTTLE ADRUINOS DISCONNECTED. WANTED VALUE: "+str(value))
             return
 
         if value < 255 and value >= 0:
@@ -106,7 +106,7 @@ class Drive:
 
     def set_steering(self, value):
         if not self.STEERING_CONNECTED:
-            print("ERROR: THROTTLE ADRUINOS DISCONNECTED. ")
+            print("ERROR: THROTTLE ADRUINOS DISCONNECTED. WANTED VALUE: "+str(value))
             return
         self.i2c_connection.writeto(self.STEERING_ADR,
                     bytes([value]))
@@ -151,7 +151,6 @@ class Drive:
 
         self.set_throttle_direct(7.85)
         while True:
-            print("hello")
             # TODO: Check state from Eunice's work? Depending on state, do different things
             state = "drive" # TODO: Replace this with actual states
 
@@ -176,12 +175,12 @@ class Drive:
                     # If the order is an RC_ORDER update speed and steering
                         if mtype == RC_ORDER:
                             throttle_str, steering_str = message.split("|")
-                            throttle_order = int(float(throttle_str))
-                            if throttle_order != 0:
-                                throttle_order = 6
-                            else:
-                                throttle_order =0;
-                            steering_order = float(steering_str)
+                            throttle_order = int(round(float(throttle_str)))
+                          #  if throttle_order != 0:
+                          #      throttle_order 
+                          #  else:
+                          #      throttle_order =0;
+                            steering_order = int(round(float(steering_str)))
                             # We only care about the latest RC_ORDER
                             break
                     # Add more if's to handle new message types (if needed). Will also need to change break behavior above.
