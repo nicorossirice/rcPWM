@@ -1,5 +1,4 @@
 import signal
-import time
 
 import Adafruit_BBIO.GPIO as GPIO
 # import Adafruit_BBIO.PWM as PWM
@@ -138,12 +137,18 @@ class Drive:
         # Encoder feedback for speed control
         # TODO: Make this connect to the Arduino in charge of the golf cart speed encoder
         UART.setup("UART1")
-        ser = Serial("/dev/ttyO1", 9600)
-        ser.close()
-        ser.open()
-        print("opened")
+        ser_encoder = Serial("/dev/ttyO1", 9600, timeout=0.1)
+        ser_encoder.close()
+        ser_encoder.open()
+        print("Opened encoder serial")
+
+        # CV feedback for entering the stop state
+        UART.setup("UART4")
+        ser_cv = Serial("/dev/ttyO4", 9600, timeout=0.1)
+        ser_cv.close()
+        ser_cv.open()
+        print("Opened cv serial")
         
-    
         # Setup GPIO for emergency stop 
         estop = False
         def interrupt_handler(channel):
@@ -222,7 +227,8 @@ class Drive:
                 if signal.SIGINT in signal.sigpending():
                     self.close()
                     server.close()
-                    ser.close()
+                    ser_encoder.close()
+                    ser_cv.close()
                     break
 
         signal.pthread_sigmask(signal.SIG_SETMASK, old_mask)
