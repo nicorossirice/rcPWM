@@ -173,7 +173,7 @@ class Drive:
         PICKUP = 2
         STOP = 3
         STATE0_PIN = "P9_23"
-        STATE1_PIN = "P9_25"
+        STATE1_PIN = "P9_27"
         GPIO.setup(STATE0_PIN, GPIO.IN)
         GPIO.setup(STATE1_PIN, GPIO.IN)
 
