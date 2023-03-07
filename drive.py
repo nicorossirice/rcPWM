@@ -58,7 +58,7 @@ class Drive:
 
         if value < 255 and value >= 0:
             self.i2c_connection.writeto(self.THROTTLE_BRAKE_ADDR,
-                    bytes([value]))
+                    bytes([int(value)]))
             self.cur_throttle = value
         else:
             print("ERROR: inappropriate throttle's value being sent = "+str(value))
@@ -109,7 +109,7 @@ class Drive:
             print("ERROR: THROTTLE ADRUINOS DISCONNECTED. WANTED VALUE: "+str(value))
             return
         self.i2c_connection.writeto(self.STEERING_ADR,
-                    bytes([value]))
+                    bytes([int(value)]))
 
     def diff_to_delta(self, throttle_diff):
         if throttle_diff < 3:
