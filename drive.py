@@ -148,9 +148,9 @@ class Drive:
         ser_cv.close()
         ser_cv.open()
         print("Opened cv serial")
+        cv_modifier = 1
         
         # Setup GPIO for emergency stop 
-        estop = False
         def interrupt_handler(channel):
             print("Emergency detected. Braking all the way. And Setting steering to 0.")
             self.set_throttle_direct(0)
@@ -220,9 +220,23 @@ class Drive:
                 #else:
                    # print("No order")
 
+                cv_modifier_enc = ser_cv.readline()
+                try:
+                    cv_modifier_str = cv_modifier_enc.decode()
+                except UnicodeDecodeError:
+                    continue
+                if cv_modifier_str[0] == "S":
+                    cv_modifier = float(cv_modifier_str[1:])
+                    if cv_modifier < 0.3:
+                        cv_modifier = 0
+                    elif cv_modifier < 0.7:
+                        cv_modifier = 0.5
+                    else:
+                        cv_modifier = 1
+
                 self.set_steering(steering_order)
                 # self.set_throttle(throttle_order, int(throttle_actual))
-                self.set_throttle(throttle_order, 0)
+                self.set_throttle(cv_modifier * throttle_order, 0)
 
                 if signal.SIGINT in signal.sigpending():
                     self.close()
