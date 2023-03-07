@@ -19,7 +19,6 @@ import busio
 # THROTTLE RANGE 7.5 - 8
 # STEERING RANGE 6-9
 
-
 class Drive:
     def __init__(self):
         self.STEERING_ADR = 0x10
@@ -48,6 +47,7 @@ class Drive:
 
         self.encoder = Encoder()
 
+        self.estop = False    
     def get_speed(self):
         return self.encoder.get_ticks()
 
@@ -56,7 +56,7 @@ class Drive:
             print("ERROR: THROTTLE ADRUINOS DISCONNECTED. WANTED VALUE: "+str(value))
             return
 
-        if value < 255 and value >= 0:
+        if value <= 255 and value >= 0:
             self.i2c_connection.writeto(self.THROTTLE_BRAKE_ADDR,
                     bytes([int(value)]))
             self.cur_throttle = value
@@ -106,7 +106,7 @@ class Drive:
 
     def set_steering(self, value):
         if not self.STEERING_CONNECTED:
-            print("ERROR: THROTTLE ADRUINOS DISCONNECTED. WANTED VALUE: "+str(value))
+            print("ERROR: STEERING ADRUINOS DISCONNECTED. WANTED VALUE: "+str(value))
             return
         self.i2c_connection.writeto(self.STEERING_ADR,
                     bytes([int(value)]))
@@ -127,7 +127,9 @@ class Drive:
         self.set_steering(128)
         self.set_throttle_direct(0)
         self.encoder.close()
-
+        
+    
+          
     def drive_loop(self):
         # Connect to Jetson Nano
         server = Server()
@@ -139,11 +141,18 @@ class Drive:
         ser.close()
         ser.open()
         print("opened")
-
-        # Setup GPIO for emergency stop
+        estop = False
+        def interrupt_handler(channel):
+          print("Emergency detected. Braking all the way. And Setting steering to 0.")
+          self.set_throttle_direct(0)
+          self.set_steering(0)
+          self.estop = True
+        # Setup GPIO for emergency stop 
         ESTOP_PIN = "P9_12"
         GPIO.setup(ESTOP_PIN, GPIO.IN)
-        estop = False
+        GPIO.add_event_detect(ESTOP_PIN, GPIO.RISING, callback=interrupt_handler)
+        
+        
 
         # Initialize variables for the main loop
         throttle_order = None
@@ -156,28 +165,13 @@ class Drive:
 
         self.set_throttle_direct(7.85)
         while True:
-            # TODO: Check state from Eunice's work? Depending on state, do different things
+            # TODO: Check  from Eunice's work? Depending on state, do different things
             state = "drive" # TODO: Replace this with actual states
 
-            if GPIO.input(ESTOP_PIN):
-                estop = True
-
-            if estop:
-                # TODO: set brake to full?
-                self.set_throttle(0, 0)
-                # TODO: Is there a way to stop the steering wheel from spinning? Only it knows where it is
-                continue
+            if self.estop:
+                return
 
             if state == "drive":
-                # Get current speed of the golf cart over serial
-                # line = ser.readline()
-                # try:
-                #     dec_line = line.decode()
-                # except UnicodeDecodeError:
-                #     continue
-                # if dec_line[0] != "S":
-                #     continue
-                # throttle_actual, steering_actual  = dec_line[1:].strip().split("|")
 
                 # Get list messages from Jetson Nano
                 messages = server.read_messages(timeout=0.001)
@@ -198,11 +192,11 @@ class Drive:
                             # We only care about the latest RC_ORDER
                             break
                     # Add more if's to handle new message types (if needed). Will also need to change break behavior above.
-                elif not throttle_order or not steering_order:
-                    print("Skipping due to no orders")
-                    continue
-                else:
-                    print("No order")
+                #elif not throttle_order or not steering_order:
+                   # print("Skipping due to no orders")
+                #    continue
+                #else:
+                   # print("No order")
 
                 self.set_steering(steering_order)
                 # self.set_throttle(throttle_order, int(throttle_actual))
