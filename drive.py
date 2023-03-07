@@ -140,14 +140,20 @@ class Drive:
         ser_encoder = Serial("/dev/ttyO1", 9600, timeout=0.1)
         ser_encoder.close()
         ser_encoder.open()
-        print("Opened encoder serial")
+        if ser_encoder.readline() != b'':
+            print("Opened encoder serial")
+        else:
+            print("Unable to read line from encoder")
 
         # CV feedback for entering the stop state
         UART.setup("UART4")
         ser_cv = Serial("/dev/ttyO4", 9600, timeout=0.1)
         ser_cv.close()
         ser_cv.open()
-        print("Opened cv serial")
+        if ser_cv.readline() != b'':
+            print("Opened cv serial")
+        else:
+            print("Unable to read line from cv")
         cv_modifier = 1
         
         # Setup GPIO for emergency stop 
@@ -174,13 +180,10 @@ class Drive:
         # Initialize variables for the main loop
         throttle_order = None
         steering_order = None
-        throttle_actual = None
-        steering_actual = None
 
         # Handle ctrl+c more gracefully
         old_mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGINT})
 
-        self.set_throttle_direct(7.85)
         while True:
             if self.estop:
                 return
@@ -190,6 +193,7 @@ class Drive:
 
             # Temporary stop, e.g. ultrasonic sensor see something
             if state == STOP:
+                print("State stop")
                 self.set_throttle_direct(0)
                 self.set_steering(0)
             # Take orders from the Jetson Nano
@@ -228,15 +232,21 @@ class Drive:
                 if cv_modifier_str[0] == "S":
                     cv_modifier = float(cv_modifier_str[1:])
                     if cv_modifier < 0.3:
+                        print("CV stop")
                         cv_modifier = 0
                     elif cv_modifier < 0.7:
                         cv_modifier = 0.5
                     else:
                         cv_modifier = 1
 
+                if throttle_order > 128:
+                    scaled_throttle_order = int((throttle_order - 128) * cv_modifier + 128)
+                else:
+                    scaled_throttle_order = throttle_order
+
                 self.set_steering(steering_order)
                 # self.set_throttle(throttle_order, int(throttle_actual))
-                self.set_throttle(cv_modifier * throttle_order, 0)
+                self.set_throttle(scaled_throttle_order, 0)
 
                 if signal.SIGINT in signal.sigpending():
                     self.close()
