@@ -1,7 +1,7 @@
 import signal
 import time
 
-# import Adafruit_BBIO.GPIO as GPIO
+import Adafruit_BBIO.GPIO as GPIO
 # import Adafruit_BBIO.PWM as PWM
 import Adafruit_BBIO.UART as UART
 from serial import Serial
@@ -140,6 +140,11 @@ class Drive:
         ser.open()
         print("opened")
 
+        # Setup GPIO for emergency stop
+        ESTOP_PIN = "P9_12"
+        GPIO.setup(ESTOP_PIN, GPIO.IN)
+        estop = False
+
         # Initialize variables for the main loop
         throttle_order = None
         steering_order = None
@@ -153,6 +158,15 @@ class Drive:
         while True:
             # TODO: Check state from Eunice's work? Depending on state, do different things
             state = "drive" # TODO: Replace this with actual states
+
+            if GPIO.input(ESTOP_PIN):
+                estop = True
+
+            if estop:
+                # TODO: set brake to full?
+                self.set_throttle(0, 0)
+                # TODO: Is there a way to stop the steering wheel from spinning? Only it knows where it is
+                continue
 
             if state == "drive":
                 # Get current speed of the golf cart over serial
