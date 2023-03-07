@@ -131,28 +131,40 @@ class Drive:
     
           
     def drive_loop(self):
-        # Connect to Jetson Nano
+        # Connect to Jetson Nano for orders
         server = Server()
         server.connect()
 
+        # Encoder feedback for speed control
         # TODO: Make this connect to the Arduino in charge of the golf cart speed encoder
         UART.setup("UART1")
         ser = Serial("/dev/ttyO1", 9600)
         ser.close()
         ser.open()
         print("opened")
+        
+    
+        # Setup GPIO for emergency stop 
         estop = False
         def interrupt_handler(channel):
-          print("Emergency detected. Braking all the way. And Setting steering to 0.")
-          self.set_throttle_direct(0)
-          self.set_steering(0)
-          self.estop = True
-        # Setup GPIO for emergency stop 
+            print("Emergency detected. Braking all the way. And Setting steering to 0.")
+            self.set_throttle_direct(0)
+            self.set_steering(0)
+            self.estop = True
+
         ESTOP_PIN = "P9_12"
         GPIO.setup(ESTOP_PIN, GPIO.IN)
         GPIO.add_event_detect(ESTOP_PIN, GPIO.RISING, callback=interrupt_handler)
         
-        
+        # Setup GPIO for state control
+        IDLE = 0
+        PARKING = 1
+        PICKUP = 2
+        STOP = 3
+        STATE0_PIN = "P9_23"
+        STATE1_PIN = "P9_25"
+        GPIO.setup(STATE0_PIN, GPIO.IN)
+        GPIO.setup(STATE1_PIN, GPIO.IN)
 
         # Initialize variables for the main loop
         throttle_order = None
@@ -165,13 +177,18 @@ class Drive:
 
         self.set_throttle_direct(7.85)
         while True:
-            # TODO: Check  from Eunice's work? Depending on state, do different things
-            state = "drive" # TODO: Replace this with actual states
-
             if self.estop:
                 return
 
-            if state == "drive":
+            # Read in fob state
+            state = 2 * GPIO.input(STATE1_PIN) + GPIO.input(STATE0_PIN)
+
+            # Temporary stop, e.g. ultrasonic sensor see something
+            if state == STOP:
+                self.set_throttle_direct(0)
+                self.set_steering(0)
+            # Take orders from the Jetson Nano
+            elif state == IDLE or state == PARKING or state == PICKUP:
 
                 # Get list messages from Jetson Nano
                 messages = server.read_messages(timeout=0.001)
