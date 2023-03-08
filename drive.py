@@ -1,7 +1,7 @@
 import signal
+import time
 
 import Adafruit_BBIO.GPIO as GPIO
-# import Adafruit_BBIO.PWM as PWM
 import Adafruit_BBIO.UART as UART
 from serial import Serial
 
@@ -45,8 +45,9 @@ class Drive:
         self.set_steering(0)
 
         self.encoder = Encoder()
-
+        
         self.estop = False    
+        
     def get_speed(self):
         return self.encoder.get_ticks()
 
@@ -56,8 +57,11 @@ class Drive:
             return
 
         if value <= 255 and value >= 0:
-            self.i2c_connection.writeto(self.THROTTLE_BRAKE_ADDR,
+            try:
+                self.i2c_connection.writeto(self.THROTTLE_BRAKE_ADDR,
                     bytes([int(value)]))
+            except:
+                pass
             self.cur_throttle = value
         else:
             print("ERROR: inappropriate throttle's value being sent = "+str(value))
@@ -107,9 +111,16 @@ class Drive:
         if not self.STEERING_CONNECTED:
             print("ERROR: STEERING ADRUINOS DISCONNECTED. WANTED VALUE: "+str(value))
             return
-        self.i2c_connection.writeto(self.STEERING_ADR,
-                    bytes([int(value)]))
-
+        value = int(value)
+        if value >255 or value <0:
+            print("Trying to end an invalid steering angle")
+            return
+        try:
+            self.i2c_connection.writeto(self.STEERING_ADR,
+                    bytes([value]))
+        except:
+            pass
+        
     def diff_to_delta(self, throttle_diff):
         if throttle_diff < 3:
             return -0.00005
@@ -157,15 +168,15 @@ class Drive:
         cv_modifier = 1
         
         # Setup GPIO for emergency stop 
-        def interrupt_handler(channel):
-            print("Emergency detected. Braking all the way. And Setting steering to 0.")
-            self.set_throttle_direct(0)
-            self.set_steering(0)
-            self.estop = True
+        def estop_pressed(channel):
+            print("Emergency Button Pressed! ")
+            time.sleep(.2)
+            if (GPIO.input(channel) == GPIO.HIGH):
+                self.estop = True
 
         ESTOP_PIN = "P9_12"
         GPIO.setup(ESTOP_PIN, GPIO.IN)
-        GPIO.add_event_detect(ESTOP_PIN, GPIO.RISING, callback=interrupt_handler)
+        GPIO.add_event_detect(ESTOP_PIN, GPIO.RISING, callback=estop_pressed)
         
         # Setup GPIO for state control
         IDLE = 0
@@ -174,8 +185,8 @@ class Drive:
         STOP = 3
         STATE0_PIN = "P9_23"
         STATE1_PIN = "P9_27"
-        GPIO.setup(STATE0_PIN, GPIO.IN)
-        GPIO.setup(STATE1_PIN, GPIO.IN)
+        # GPIO.setup(STATE0_PIN, GPIO.IN)
+        #GPIO.setup(STATE1_PIN, GPIO.IN)
 
         # Initialize variables for the main loop
         throttle_order = None
@@ -186,16 +197,19 @@ class Drive:
 
         while True:
             if self.estop:
+                self.set_throttle_direct(0)
+                self.set_steering(128)
+                print("SHUTTING DOWN SYSTEM DUE TO E-BUTTON!!!!")
                 return
 
             # Read in fob state
-            state = 2 * GPIO.input(STATE1_PIN) + GPIO.input(STATE0_PIN)
-
+ #           state = 2 * GPIO.input(STATE1_PIN) + GPIO.input(STATE0_PIN)
+            state = PICKUP
             # Temporary stop, e.g. ultrasonic sensor see something
             if state == STOP:
-                print("State stop")
+                print("STATE: STOP!!!!!")
                 self.set_throttle_direct(0)
-                self.set_steering(0)
+                self.set_steering(128)
             # Take orders from the Jetson Nano
             elif state == IDLE or state == PARKING or state == PICKUP:
 
@@ -224,21 +238,21 @@ class Drive:
                 #else:
                    # print("No order")
 
-                cv_modifier_enc = ser_cv.readline()
-                try:
-                    cv_modifier_str = cv_modifier_enc.decode()
-                except UnicodeDecodeError:
-                    continue
-                if cv_modifier_str[0] == "S":
-                    cv_modifier = float(cv_modifier_str[1:])
-                    if cv_modifier < 0.3:
-                        print("CV stop")
-                        cv_modifier = 0
-                    elif cv_modifier < 0.7:
-                        cv_modifier = 0.5
-                    else:
-                        cv_modifier = 1
-
+            #    cv_modifier_enc = ser_cv.readline()
+            #    try:
+            #        cv_modifier_str = cv_modifier_enc.decode()
+            #    except UnicodeDecodeError:
+            #        continue
+            #    if cv_modifier_str[0] == "S":
+            #        cv_modifier = float(cv_modifier_str[1:])
+            #        if cv_modifier < 0.3:
+            #            print("CV stop")
+            #            cv_modifier = 0
+            #        elif cv_modifier < 0.7:
+            #            cv_modifier = 0.5
+            #        else:
+            #            cv_modifier = 1
+                cv_modifier = 1
                 if throttle_order > 128:
                     scaled_throttle_order = int((throttle_order - 128) * cv_modifier + 128)
                 else:
