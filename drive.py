@@ -263,6 +263,7 @@ class Drive:
                 self.set_throttle(scaled_throttle_order, 0)
 
                 if signal.SIGINT in signal.sigpending():
+                    print("Cleaning up...")
                     self.close()
                     server.close()
                     ser_encoder.close()
