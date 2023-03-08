@@ -14,6 +14,8 @@ import sys
 import board
 import busio
 
+import subprocess
+
 
 # THROTTLE RANGE 7.5 - 8
 # STEERING RANGE 6-9
@@ -142,6 +144,12 @@ class Drive:
           
     def drive_loop(self):
         # Connect to Jetson Nano for orders
+        # Kill the process
+        try:
+            pid = subprocess.check_output(['lsof', '-ti', f':{60006}']).strip()
+            subprocess.run(['kill','-9', pid])
+        except:
+            pass
         server = Server()
         server.connect()
 
