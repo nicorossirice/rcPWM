@@ -109,9 +109,12 @@ class Drive:
         self.throttle_bypass = BYPASS
         self.throttle_old = value
         
-        if value > 255 or value < 0:
+        if value > 255:
             logger.warning("Inappropriate throttle's value being sent = "+str(value))
-            return
+            value = 255
+        elif value<0:
+            logger.warning("Inappropriate throttle's value being sent = "+str(value))
+            value = 0
         
         readbuffer = bytearray(1)
         try:
@@ -169,7 +172,6 @@ class Drive:
     
     def send_steering_throttle(self, steering, throttle, cur_throttle):
         self.set_steering(steering)
-        
         self.set_throttle(throttle, cur_throttle)
         
         
@@ -183,6 +185,7 @@ class Drive:
     def drive_loop(self):
         # Connect to Jetson Nano for orders
         # Kill the process
+        old_throttle_val = 0
         
         try:
             logger.info("Try killing existing process with opened port 60006.")
@@ -309,12 +312,14 @@ class Drive:
                 
                 cur_throttle_enc = ser_encoder.readline()
                 try:
-                   cur_throttle_str = cur_throttle_enc.decode()
+                    cur_throttle_str = cur_throttle_enc.decode()
+                    if cur_throttle_str[0] == "S":
+                        cur_throttle = float(cur_throttle_str[1:])
+                        old_throttle_val = cur_throttle
                 except UnicodeDecodeError:
-                    continue
+                    cur_throttle = old_throttle_val
                
-                if cur_throttle_str[0] == "S":
-                    cur_throttle = int(cur_throttle_str[1:])
+               
                        
                 self.send_steering_throttle(steering_order, scaled_throttle_order, cur_throttle)
 
@@ -337,27 +342,36 @@ class Drive:
             self.set_throttle_direct(target)
             return
         
+        if current >=4:
+            logger.warning("Overthrottled")
+            self.set_throttle_direct(0)
+            return
+        
         # Remapping the current speed read from the sensor to within 128 to 255.
-        max_speed = 500
-        current = 128 + (current/(max_speed))*128 
+        max_speed = 3
+        current = int(128 + (current/(max_speed))*128)
         
         if target > 128 and current == 0 and not self.jumped:
             self.jumped = True
             jump = 10 # TODO: Tune this value
+        else:
+            jump = 0
         
         diff = abs(target - current)
         #print(target, current, diff)
         if target > 128:
-            if diff < 1:
+            if diff < 3:
                 pass
             elif current < target:
                 # print("Throttle increase")
-                self.set_throttle_direct(self.cur_throttle + (jump + self.diff_to_delta(diff)))
+                self.set_throttle_direct(
+                    self.cur_throttle + (jump + self.diff_to_delta(diff))
+                    )
 
             elif current > target:
                 self.set_throttle_direct(
                     self.cur_throttle - (jump + self.diff_to_delta(diff))
-                )
+                    )
         # elif target < 0:
         #     target = abs(target)
         #     if diff < 1:
@@ -377,16 +391,17 @@ class Drive:
         return self.encoder.get_ticks()
     
     def diff_to_delta(self, throttle_diff):
-        if throttle_diff < 3:
-            return -0.00005
-        elif throttle_diff < 5:
-            return 0.00005
-        elif throttle_diff < 6:
-            return 0.0001
-        elif throttle_diff < 8:
-            return 0.0003
-        else:
-            return 0.0004
+        return throttle_diff*.5
+        # if throttle_diff < 3:
+        #     return -0.00005
+        # elif throttle_diff < 5:
+        #     return 0.00005
+        # elif throttle_diff < 6:
+        #     return 0.0001
+        # elif throttle_diff < 8:
+        #     return 0.0003
+        # else:
+        #     return 0.0004
 
     
 if __name__ == "__main__":
