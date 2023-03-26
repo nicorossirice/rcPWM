@@ -19,7 +19,7 @@ import subprocess
 import argparse
 import logging
 
-BYPASS = 1000
+BYPASS = 100
 # THROTTLE RANGE 7.5 - 8
 # STEERING RANGE 6-9
 
@@ -91,7 +91,7 @@ class Drive:
             return
         
         if not self.THROTTLE_CONNECTED:
-            logger.warning('THROTTLE DISCONNECTED. '+str(value))
+            # logger.warning('THROTTLE DISCONNECTED. '+str(value))
             return
         
         connected_devs = []
@@ -102,7 +102,7 @@ class Drive:
             return
 
         if not self.THROTTLE_BRAKE_ADDR in connected_devs:
-            logger.warning("THROTTLE ADRUINOS DISCONNECTED. WANTED VALUE: "+str(value))
+            # logger.warning("THROTTLE ADRUINOS DISCONNECTED. WANTED VALUE: "+str(value))
             return
         
         global BYPASS
@@ -135,16 +135,16 @@ class Drive:
             logger.warning("STEERING DISCONNECTED. "+str(value))
             return
         
-        connected_devs = []
-        try:
-            connected_devs = self.i2c.scan()
-        except:
-            logger.warning("NO DEVICES FOUND")
-            return
+        # connected_devs = []
+        # try:
+        #     connected_devs = self.i2c.scan()
+        # except:
+        #     logger.warning("NO DEVICES FOUND")
+        #     return
     
-        if  self.STEERING_ADDR in connected_devs:
-            logger.warning("STEERING ADRUINOS DISCONNECTED. WANTED VALUE: "+str(value))
-            return
+        # if  self.STEERING_ADDR in connected_devs:
+        #     logger.warning("STEERING ADRUINOS DISCONNECTED. WANTED VALUE: "+str(value))
+        #     return
        
         global BYPASS 
         self.steering_bypass = BYPASS
