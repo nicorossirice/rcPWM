@@ -91,19 +91,19 @@ class Drive:
             return
         
         if not self.THROTTLE_CONNECTED:
-            # logger.warning('THROTTLE DISCONNECTED. '+str(value))
+            logger.warning('THROTTLE DISCONNECTED. '+str(value))
             return
         
-        connected_devs = []
-        try:
-            connected_devs  = self.i2c.scan()
-        except:
-            logger.warning("NO DEVICES CONNECTED")
-            return
+        # connected_devs = []
+        # try:
+        #     connected_devs  = self.i2c.scan()
+        # except:
+        #     logger.warning("NO DEVICES CONNECTED")
+        #     return
 
-        if not self.THROTTLE_BRAKE_ADDR in connected_devs:
-            # logger.warning("THROTTLE ADRUINOS DISCONNECTED. WANTED VALUE: "+str(value))
-            return
+        # if not self.THROTTLE_BRAKE_ADDR in connected_devs:
+        #     logger.warning("THROTTLE ADRUINOS DISCONNECTED. WANTED VALUE: "+str(value))
+        #     return
         
         global BYPASS
         self.throttle_bypass = BYPASS
@@ -167,9 +167,12 @@ class Drive:
             self.set_steering(value)
 
     
-    def send_steering_throttle(self, steering, throttle):
+    def send_steering_throttle(self, steering, throttle, cur_throttle):
         self.set_steering(steering)
-        self.set_throttle_direct(throttle)
+        
+        self.set_throttle(throttle, cur_throttle)
+        
+        
     
 
     
@@ -202,7 +205,7 @@ class Drive:
         ser_encoder.close()
         ser_encoder.open()
         if ser_encoder.readline() != b'':
-            logger.info("Opened encoder serial")
+            logger.info("Opened encoder serial sucessfully!!!")
         else:
             logger.warning("Unable to read line from encoder")
 
@@ -212,7 +215,7 @@ class Drive:
         ser_cv.close()
         ser_cv.open()
         if ser_cv.readline() != b'':
-            logger.info("Opened cv serial")
+            logger.info("Opened cv serial sucessfully!!!")
         else:
             logger.warning("Unable to read line from cv")
         cv_modifier = 1
@@ -272,10 +275,6 @@ class Drive:
                         if mtype == RC_ORDER:
                             throttle_str, steering_str = message.split("|")
                             throttle_order = int(round(float(throttle_str)))
-                          #  if throttle_order != 0:
-                          #      throttle_order 
-                          #  else:
-                          #      throttle_order =0;
                             steering_order = int(round(float(steering_str)))
                             # We only care about the latest RC_ORDER
                             break
@@ -306,7 +305,18 @@ class Drive:
                 else:
                     scaled_throttle_order = throttle_order
                 logger.info(str(steering_order)+'|'+str(scaled_throttle_order))
-                self.send_steering_throttle(steering_order, scaled_throttle_order)
+                
+                
+                cur_throttle_enc = ser_encoder.readline()
+                try:
+                   cur_throttle_str = cur_throttle_enc.decode()
+                except UnicodeDecodeError:
+                    continue
+               
+                if cur_throttle_str[0] == "S":
+                    cur_throttle = int(cur_throttle_str[1:])
+                       
+                self.send_steering_throttle(steering_order, scaled_throttle_order, cur_throttle)
 
                 if signal.SIGINT in signal.sigpending():
                     logger.info("Cleaning up...")
@@ -318,45 +328,50 @@ class Drive:
 
         signal.pthread_sigmask(signal.SIG_SETMASK, old_mask)
 
-    def set_throttle(self, target, current, delta=0.0001):
-        self.set_throttle_direct(target)
-        return
-
-        if target == 0:
+    # current: in the encoder space
+    # target: in 0-255 range with 128-255 being throttling
+    def set_throttle(self, target, current):
+        if target <= 128:
             self.jumped = False
-            print("Throttle zeroed")
-            #self.set_throttle_direct(self.start_throttle)
-            self.set_throttle_direct(0)
+            logger.info("Throttle zeroed")
+            self.set_throttle_direct(target)
             return
-
+        
+        # Remapping the current speed read from the sensor to within 128 to 255.
+        max_speed = 500
+        current = 128 + (current/(max_speed))*128 
+        
+        if target > 128 and current == 0 and not self.jumped:
+            self.jumped = True
+            jump = 10 # TODO: Tune this value
+        
         diff = abs(target - current)
         #print(target, current, diff)
-        if target > 0:
+        if target > 128:
             if diff < 1:
                 pass
             elif current < target:
                 # print("Throttle increase")
-                # self.set_throttle_direct(self.cur_throttle + delta)
                 self.set_throttle_direct(self.cur_throttle + (jump + self.diff_to_delta(diff)))
-                #self.set_throttle_direct(target)
+
             elif current > target:
                 self.set_throttle_direct(
                     self.cur_throttle - (jump + self.diff_to_delta(diff))
                 )
-        elif target < 0:
-            target = abs(target)
-            if diff < 1:
-                pass
-            elif current > target:
-                self.set_throttle_direct(
-                    self.cur_throttle + (jump + self.diff_to_delta(diff))
-                )
-            elif current < target:
-                # print("Throttle decrease")
-                # self.set_throttle_direct(self.cur_throttle - delta)
-                self.set_throttle_direct(self.cur_throttle - (jump + self.diff_to_delta(diff)))
-                #self.set_throttle_direct(target)
-            # print(self.cur_throttle)
+        # elif target < 0:
+        #     target = abs(target)
+        #     if diff < 1:
+        #         pass
+        #     elif current > target:
+        #         self.set_throttle_direct(
+        #             self.cur_throttle + (jump + self.diff_to_delta(diff))
+        #         )
+        #     elif current < target:
+        #         # print("Throttle decrease")
+        #         # self.set_throttle_direct(self.cur_throttle - delta)
+        #         self.set_throttle_direct(self.cur_throttle - (jump + self.diff_to_delta(diff)))
+        #         #self.set_throttle_direct(target)
+        #     # print(self.cur_throttle)
 
     def get_speed(self):
         return self.encoder.get_ticks()
