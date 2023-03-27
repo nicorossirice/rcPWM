@@ -85,7 +85,8 @@ class Drive:
         
         self.encoder = Encoder()
 
-    def set_throttle_direct(self, value: int):
+    def set_throttle_direct(self, value):
+        value = int(value)
         if self.throttle_old ==  value and self.throttle_bypass > 0:
             self.throttle_bypass -= 1
             return
@@ -171,7 +172,7 @@ class Drive:
 
     
     def send_steering_throttle(self, steering, throttle, cur_throttle):
-        self.set_steering(steering)
+       # self.set_steering(steering)
         self.set_throttle(throttle, cur_throttle)
         
         
@@ -313,10 +314,11 @@ class Drive:
                 cur_throttle_enc = ser_encoder.readline()
                 try:
                     cur_throttle_str = cur_throttle_enc.decode()
+                    print(cur_throttle_str)
                     if cur_throttle_str[0] == "S":
                         cur_throttle = float(cur_throttle_str[1:])
                         old_throttle_val = cur_throttle
-                except UnicodeDecodeError:
+                except:
                     cur_throttle = old_throttle_val
                
                
@@ -391,10 +393,12 @@ class Drive:
         return self.encoder.get_ticks()
     
     def diff_to_delta(self, throttle_diff):
-        return throttle_diff*.5
-        # if throttle_diff < 3:
-        #     return -0.00005
-        # elif throttle_diff < 5:
+        if throttle_diff > 100:
+             return throttle_diff*.5
+        elif throttle_diff > 50:
+            return throttle_diff*.3
+        else:
+            return throttle_diff*.1
         #     return 0.00005
         # elif throttle_diff < 6:
         #     return 0.0001
