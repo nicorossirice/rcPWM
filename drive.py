@@ -245,6 +245,13 @@ class Drive:
         #GPIO.setup(STATE0_PIN, GPIO.IN)
         #GPIO.setup(STATE1_PIN, GPIO.IN)
 
+        # Setup GPIO for direction control
+        DIR_ORDER_PIN = "P8_7"
+        DIR_VALID_PIN = "P8_8"
+        # GPIO.setup(DIR_ORDER_PIN, GPIO.OUT)
+        # GPIO.setup(DIR_VALID_PIN, GPIO.IN)
+        cur_dir = 0
+
         # Initialize variables for the main loop
         throttle_order = None
         steering_order = None
@@ -265,6 +272,28 @@ class Drive:
             if state == STOP:
                 logger.info("STATE: STOP!!!!!")
                 self.send_steering_throttle(128, 0)
+
+            # Check if direction position is valid
+            valid = GPIO.input(DIR_VALID_PIN)
+
+            if not valid:
+                continue
+
+            # Check if desired direction differs from current direction
+
+            # TODO: Fix this
+            if state == REVERSE and cur_dir == 0:
+                # TODO: Switch to reverse
+                GPIO.output(DIR_ORDER_PIN, GPIO.HIGH)
+                cur_dir = 1
+                continue
+
+            if state == FORWARD and cur_dir == 1:
+                # TODO: Switch to forward
+                GPIO.output(DIR_ORDER_PIN, GPIO.LOW)
+                cur_dir = 0
+                continue
+
             # Take orders from the Jetson Nano
             elif state == IDLE or state == PARKING or state == PICKUP:
 
