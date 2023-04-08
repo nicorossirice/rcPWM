@@ -7,7 +7,7 @@ from serial import Serial
 
 from encoder import Encoder
 from EthernetAPI.server import Server
-from EthernetAPI.message_types import RC_ORDER
+from EthernetAPI.message_types import RC_ORDER, RV_ORDER
 
 # imports for I2C communications
 import sys
@@ -259,6 +259,8 @@ class Drive:
         # Handle ctrl+c more gracefully
         old_mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGINT})
 
+        switched_dir = False
+
         while True:
             if self.estop:
                 self.send_steering_throttle(128, 0)
@@ -276,7 +278,9 @@ class Drive:
             # Check if direction position is valid
             valid = GPIO.input(DIR_VALID_PIN)
 
-            if not valid:
+            if not valid or switched_dir:
+                if not valid:
+                    switched_dir = False
                 continue
 
             # Check if desired direction differs from current direction
@@ -285,12 +289,14 @@ class Drive:
             if state == REVERSE and cur_dir == 0:
                 # TODO: Switch to reverse
                 GPIO.output(DIR_ORDER_PIN, GPIO.HIGH)
+                switched_dir = True
                 cur_dir = 1
                 continue
 
             if state == FORWARD and cur_dir == 1:
                 # TODO: Switch to forward
                 GPIO.output(DIR_ORDER_PIN, GPIO.LOW)
+                switched_dir = True
                 cur_dir = 0
                 continue
 
@@ -303,14 +309,30 @@ class Drive:
                 # List is considered False if empty
                 if messages:
                     # Work through the messages in reverse order
+                    found_rc_order = False
+                    found_rv_order = False
                     for mtype, message in messages[::-1]:
                     # If the order is an RC_ORDER update speed and steering
-                        if mtype == RC_ORDER:
+                        if mtype == RC_ORDER and not found_rc_order:
+                            found_rc_order = True
                             throttle_str, steering_str = message.split("|")
                             throttle_order = int(round(float(throttle_str)))
                             steering_order = int(round(float(steering_str)))
                             # We only care about the latest RC_ORDER
-                            break
+                        elif mtype == RV_ORDER:
+                            found_rv_order = True
+                            if cur_dir == 0:
+                                GPIO.output(DIR_ORDER_PIN, GPIO.HIGH)
+                                switched_dir = True
+                                cur_dir = 1
+                                break
+                            else:
+                                GPIO.output(DIR_ORDER_PIN, GPIO.LOW)
+                                switched_dir = True
+                                cur_dir = 0
+                                break
+                    if found_rv_order:
+                        continue
                     # Add more if's to handle new message types (if needed). Will also need to change break behavior above.
                 #elif not throttle_order or not steering_order:
                    # print("Skipping due to no orders")
