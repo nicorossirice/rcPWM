@@ -238,7 +238,7 @@ class Drive:
         # Setup GPIO for state control
         IDLE = 0
         PARKING = 1
-        PICKUP = 2
+        REVUNPARK = 2
         STOP = 3
         STATE0_PIN = "P9_23"
         STATE1_PIN = "P9_27"
@@ -269,7 +269,7 @@ class Drive:
 
             # Read in fob state
  #           state = 2 * GPIO.input(STATE1_PIN) + GPIO.input(STATE0_PIN)
-            state = PICKUP
+            state = IDLE
             # Temporary stop, e.g. ultrasonic sensor see something
             if state == STOP:
                 logger.info("STATE: STOP!!!!!")
@@ -286,14 +286,14 @@ class Drive:
             # Check if desired direction differs from current direction
 
             # TODO: Fix this
-            if state == REVERSE and cur_dir == 0:
+            if state == REVUNPARK and cur_dir == 0:
                 # TODO: Switch to reverse
                 GPIO.output(DIR_ORDER_PIN, GPIO.HIGH)
                 switched_dir = True
                 cur_dir = 1
                 continue
 
-            if state == FORWARD and cur_dir == 1:
+            if state == PARKING and cur_dir == 1:
                 # TODO: Switch to forward
                 GPIO.output(DIR_ORDER_PIN, GPIO.LOW)
                 switched_dir = True
